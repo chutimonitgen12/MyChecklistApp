@@ -1,0 +1,744 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ระบบตรวจเช็ครายการอุปกรณ์ (Multi-Project & Summary)</title>
+    
+    <script src="https://cdn.jsdelivr.net/npm/exceljs@4.3.0/dist/exceljs.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/file-saver@2.0.5/dist/FileSaver.min.js"></script>
+    
+    <style>
+        :root { --bg-table-header: #8ab0b5; --bg-main-header: #34495e; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f7f6; padding: 20px; margin: 0; }
+        .container { max-width: 1500px; margin: auto; background: white; padding: 20px 30px; box-shadow: 0 0 10px rgba(0,0,0,0.1); border-radius: 8px; overflow-x: auto; }
+        h2 { color: #2c3e50; text-align: center; border-bottom: 2px solid #ddd; padding-bottom: 10px; margin-bottom: 20px; }
+
+        /* ระบบจัดการโปรเจกต์ */
+        .project-bar { background: #eef2f5; padding: 15px; border-radius: 6px; margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between; border: 1px solid #dcdde1; }
+        .project-controls { display: flex; align-items: center; gap: 10px; }
+        .project-select { padding: 8px; font-size: 16px; border-radius: 4px; border: 1px solid #bdc3c7; font-weight: bold; width: 250px; }
+        .btn-add-proj { background-color: #2980b9; color: white; border: none; padding: 8px 15px; border-radius: 4px; cursor: pointer; font-weight: bold; }
+        .btn-del-proj { background-color: #c0392b; color: white; border: none; padding: 8px 15px; border-radius: 4px; cursor: pointer; font-weight: bold; }
+
+        /* เมนูส่วนหัว */
+        .menu-buttons { display: flex; justify-content: flex-end; gap: 10px; margin-bottom: 15px; }
+        .menu-buttons button { padding: 10px 20px; border: none; border-radius: 5px; color: white; cursor: pointer; font-size: 14px; font-weight: bold; transition: 0.3s; }
+        .menu-buttons button:hover { opacity: 0.8; }
+        .btn-import-excel { background-color: #8e44ad; }
+        .btn-export-excel { background-color: #2ecc71; }
+        .btn-print-pdf { background-color: #e74c3c; }
+
+        /* ส่วนหมวดหมู่ */
+        .category-section { margin-bottom: 30px; border: 2px solid var(--bg-table-header); border-radius: 4px; overflow: hidden; background: #fff; }
+        .category-header-bar { background-color: var(--bg-table-header); padding: 8px 15px; display: flex; justify-content: space-between; align-items: center; }
+        .category-header-bar input { background: transparent; border: 1px dashed transparent; color: #1a252f; font-size: 18px; font-weight: bold; padding: 4px 8px; width: 300px; }
+        .category-header-bar input:hover { border-color: #fff; }
+        .category-header-bar input:focus { background: #fff; outline: none; border-style: solid; }
+
+        table { width: 100%; border-collapse: collapse; min-width: 1200px; table-layout: fixed; }
+        th, td { border: 1px solid #7a9ea4; padding: 6px; text-align: center; vertical-align: middle; }
+        th { background-color: #f0f5f6; color: #333; font-weight: bold; font-size: 13px; }
+
+        .col-no { width: 45px; } .col-item { width: 260px; } .col-source { width: 120px; }
+        .col-status { width: 170px; } .col-check { width: 50px; } .col-remark { width: 160px; } .col-manage { width: 60px; }
+
+        input[type="text"], textarea { width: 100%; box-sizing: border-box; border: 1px solid transparent; padding: 4px; font-size: 13px; font-family: inherit; background-color: transparent; text-align: center; }
+        textarea.auto-expand { resize: none; overflow: hidden; text-align: left; line-height: 1.4; min-height: 28px; }
+        input[type="text"]:focus, textarea:focus { border: 1px solid #3498db; background-color: #fff; outline: none; }
+        input[type="checkbox"] { width: 18px; height: 18px; cursor: pointer; }
+        select { width: 100%; padding: 4px; font-size: 12px; border: 1px solid #ccc; border-radius: 4px; font-weight: bold; }
+
+        .header-input { width: 80% !important; font-weight: bold; text-align: center !important; border: 1px solid transparent !important; background: transparent; font-size: 13px; }
+        .header-input:hover { border: 1px dashed #7f8c8d !important; background: #fff; }
+
+        .status-red { background-color: #e74c3c !important; color: white !important; }
+        .status-orange { background-color: #f39c12 !important; color: white !important; }
+        .status-yellow { background-color: #f1c40f !important; color: black !important; }
+        .status-blue { background-color: #3498db !important; color: white !important; }
+        .status-green { background-color: #27ae60 !important; color: white !important; }
+
+        .btn-delete { background-color: #ff4d4d; color: white; border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer; font-size: 12px; }
+        .btn-add-row { background-color: #ecf0f1; color: #2c3e50; border: 1px dashed #bdc3c7; padding: 10px; width: 100%; cursor: pointer; font-weight: bold; }
+        .btn-add-section { background-color: #16a085; color: white; border: none; padding: 15px; border-radius: 5px; cursor: pointer; font-size: 14px; font-weight: bold; width: 100%; margin-top: 20px; }
+        .btn-add-col { background-color: #27ae60; color: white; border: none; border-radius: 50%; width: 22px; height: 22px; font-size: 14px; cursor: pointer; }
+        .btn-del-col { background-color: transparent; color: #e74c3c; border: none; font-size: 12px; cursor: pointer; }
+
+        @media print {
+            @page { size: A4 landscape; margin: 10mm; }
+            body { background: white; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            .menu-buttons, .project-bar, .btn-add-section, .btn-add-row, .btn-delete, .manage-col, .btn-add-col, .btn-del-col { display: none !important; }
+            .category-section { border: 1px solid #333; page-break-inside: avoid; }
+            input, textarea, select { border: none !important; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>📝 ระบบตรวจเช็ครายการอุปกรณ์</h2>
+
+    <div class="project-bar">
+        <div class="project-controls">
+            <span>📂 <b>โปรเจกต์:</b></span>
+            <select id="projectSelector" class="project-select" onchange="switchProject(this.value)"></select>
+            <button class="btn-add-proj" onclick="addNewProject()">+ สร้างโปรเจกต์ใหม่</button>
+        </div>
+        <div>
+            <button class="btn-del-proj" onclick="deleteCurrentProject()">🗑️ ลบโปรเจกต์นี้</button>
+        </div>
+    </div>
+
+    <div class="menu-buttons">
+        <input type="file" id="importFile" hidden accept=".xlsx" onchange="handleImport(this)">
+        <button class="btn-import-excel" onclick="document.getElementById('importFile').click()">Import Excel</button>
+        <button class="btn-export-excel" onclick="exportBeautifulExcel()">Export Excel (โปรเจกต์นี้)</button>
+        <button class="btn-print-pdf" onclick="window.print()">Print PDF</button>
+    </div>
+
+    <div id="sectionsContainer"></div>
+
+    <div id="summaryContainer" style="margin-top: 40px; margin-bottom: 20px; background: #fff; padding: 20px; border: 2px dashed #3498db; border-radius: 8px;">
+        <h3 style="text-align: center; color: #2980b9; margin-top: 0;">🛒 สรุปรายการสั่งซื้อ (แยกตามแหล่งสั่งซื้อ)</h3>
+        <table style="width: 95%; margin: auto; border-collapse: collapse; background-color: #fafafa; min-width: auto;">
+            <thead>
+                <tr>
+                    <th style="background-color: #34495e; color: white; border: 1px solid #bdc3c7; padding: 10px; width: 25%;">รายการอุปกรณ์</th>
+                    <th style="background-color: #34495e; color: white; border: 1px solid #bdc3c7; padding: 10px; width: 20%;">หมายเหตุ</th>
+                    <th style="background-color: #34495e; color: white; border: 1px solid #bdc3c7; padding: 10px; width: 10%;">จำนวนสั่งซื้อ</th>
+                    <th style="background-color: #34495e; color: white; border: 1px solid #bdc3c7; padding: 10px; width: 15%;">สั่งซื้อจาก</th>
+                    <th style="background-color: #34495e; color: white; border: 1px solid #bdc3c7; padding: 10px; width: 20%;">ราคาค่าของ (บาท)</th>
+                    <th style="background-color: #34495e; color: white; border: 1px solid #bdc3c7; padding: 10px; width: 10%;">✔ สั่งเรียบร้อย</th>
+                </tr>
+            </thead>
+            <tbody id="summaryBody">
+                <tr><td colspan="6" style="text-align: center; color: #7f8c8d; padding: 10px;">ยังไม่มีข้อมูลยอดสั่งซื้อ</td></tr>
+            </tbody>
+        </table>
+    </div>
+    
+    <button class="btn-add-section" onclick="createSection('หมวดหมู่ใหม่', ['พื้นที่ 1'])">+ เพิ่มหมวดหมู่หลักใหม่</button>
+</div>
+
+<script>
+    // ----------------------------------------------------
+    const API_URL = "https://script.google.com/macros/s/AKfycbxU_WzQhWJouODcgPVsqBuWTHgjAYQt0Oe_ATO8NAJX1t47N6p0xp-ewV0nn-mhdApM/exec"; 
+    // ----------------------------------------------------
+
+    let appDatabase = { "โปรเจกต์ 1 (เริ่มต้น)": { sections: [], summaryMeta: { prices: {}, checks: {}, remarks: {} } } };
+    let currentProject = "โปรเจกต์ 1 (เริ่มต้น)";
+    let currentSummaryMeta = { prices: {}, checks: {}, remarks: {} };
+
+    let autoSaveTimeout = null;
+    let isInitialLoad = true;
+
+    window.onload = function() {
+        updateProjectDropdown();
+        
+        const menuBtn = document.querySelector('.menu-buttons');
+        if(!document.getElementById('autoSaveStatus')) {
+            menuBtn.insertAdjacentHTML('afterbegin', '<span id="autoSaveStatus" style="margin-right:auto; color:#7f8c8d; font-weight:bold; align-self:center; font-size:14px;"></span>');
+        }
+
+        document.addEventListener('input', (e) => {
+            if (e.target.closest('#summaryContainer')) return; 
+            triggerAutoSave(true);
+        });
+        document.addEventListener('change', (e) => {
+            if (e.target.closest('#summaryContainer')) return;
+            triggerAutoSave(true);
+        });
+        document.addEventListener('click', (e) => {
+            if(e.target.tagName === 'BUTTON' && !e.target.closest('#summaryContainer')) triggerAutoSave(true);
+        });
+
+        silentLoadFromCloud();
+    };
+
+    function triggerAutoSave(redrawSummary = true) {
+        if(isInitialLoad) return; 
+        
+        const statusEl = document.getElementById('autoSaveStatus');
+        if(statusEl) statusEl.innerHTML = "⏳ รอเซฟข้อมูล...";
+        
+        if(redrawSummary) generateSummary();
+
+        clearTimeout(autoSaveTimeout);
+        autoSaveTimeout = setTimeout(() => {
+            silentSaveToCloud();
+        }, 2000);
+    }
+
+    async function silentSaveToCloud() {
+        saveScreenToDB(); 
+        const statusEl = document.getElementById('autoSaveStatus');
+        if(statusEl) statusEl.innerHTML = "🔄 กำลังอัปเดตออนไลน์...";
+        
+        try {
+            const response = await fetch(API_URL, { method: 'POST', body: JSON.stringify(appDatabase) });
+            const result = await response.json();
+            if(result.status === 'success') {
+                if(statusEl) statusEl.innerHTML = "✅ บันทึกล่าสุด: " + new Date().toLocaleTimeString('th-TH');
+            }
+        } catch (err) {
+            console.error(err);
+            if(statusEl) statusEl.innerHTML = "❌ เซฟล้มเหลว ตรวจสอบอินเทอร์เน็ต";
+        }
+    }
+
+    async function silentLoadFromCloud() {
+        const statusEl = document.getElementById('autoSaveStatus');
+        if(statusEl) statusEl.innerHTML = "🔄 กำลังดึงข้อมูลจากออนไลน์...";
+        
+        try {
+            const response = await fetch(API_URL);
+            const data = await response.json();
+            
+            if (data && !Array.isArray(data) && Object.keys(data).length > 0) {
+                appDatabase = data; 
+                currentProject = Object.keys(appDatabase)[0]; 
+            } else {
+                createSection('ภายนอก', ['โรงรถ', 'ด้านข้าง']);
+            }
+            updateProjectDropdown();
+            renderScreenFromDB(currentProject);
+            
+            if(statusEl) statusEl.innerHTML = "✅ โหลดข้อมูลสำเร็จ";
+            setTimeout(() => { if(statusEl) statusEl.innerHTML = ""; }, 3000);
+        } catch (err) {
+            console.error(err);
+            if(statusEl) statusEl.innerHTML = "❌ โหลดล้มเหลว (อาจยังไม่มีข้อมูล)";
+            createSection('ภายนอก', ['โรงรถ', 'ด้านข้าง']);
+        }
+        
+        setTimeout(() => { isInitialLoad = false; }, 1000); 
+    }
+
+    function updateProjectDropdown() {
+        const sel = document.getElementById('projectSelector');
+        if(!sel) return;
+        sel.innerHTML = '';
+        for(let projName in appDatabase) {
+            let opt = document.createElement('option');
+            opt.value = projName; opt.text = projName;
+            if(projName === currentProject) opt.selected = true;
+            sel.appendChild(opt);
+        }
+    }
+
+    function saveScreenToDB() {
+        let screenData = [];
+        const sections = document.querySelectorAll('.category-section');
+        sections.forEach(sec => {
+            let title = sec.querySelector('.category-title-input').value;
+            let areas = Array.from(sec.querySelectorAll('.qty-col-header input')).map(i => i.value);
+            let rows = [];
+            
+            sec.querySelectorAll('.table-body tr').forEach(tr => {
+                let item = tr.querySelector('td:nth-child(2) textarea').value;
+                let qtys = Array.from(tr.querySelectorAll('.qty-cell input')).map(inp => inp.value);
+                let source = tr.querySelector('.source-cell select').value;
+                let statusValue = tr.querySelector('.status-select').value;
+                let checks = Array.from(tr.querySelectorAll('input[type="checkbox"]')).map(c => c.checked);
+                
+                let remarkNode = tr.querySelector('.remark-input');
+                let remark = remarkNode ? remarkNode.value : "";
+                
+                let summaryQtyNode = tr.querySelector('.summary-qty-input');
+                let summaryQty = summaryQtyNode ? summaryQtyNode.value : "";
+
+                rows.push({ item, qtys, source, status: statusValue, checks, remark, summaryQty });
+            });
+            screenData.push({ title, areas, rows });
+        });
+        
+        appDatabase[currentProject] = {
+            sections: screenData,
+            summaryMeta: currentSummaryMeta
+        };
+    }
+
+    function renderScreenFromDB(projName) {
+        document.getElementById('sectionsContainer').innerHTML = "";
+        let projData = appDatabase[projName] || { sections: [], summaryMeta: { prices: {}, checks: {}, remarks: {} } };
+        
+        let sectionsData = [];
+        if (Array.isArray(projData)) {
+            sectionsData = projData; 
+            currentSummaryMeta = { prices: {}, checks: {}, remarks: {} };
+        } else {
+            sectionsData = projData.sections || [];
+            currentSummaryMeta = projData.summaryMeta || { prices: {}, checks: {}, remarks: {} };
+        }
+
+        sectionsData.forEach(secData => {
+            let sid = createSection(secData.title, secData.areas);
+            secData.rows.forEach(r => addRow(sid, r));
+        });
+        generateSummary();
+    }
+
+    function switchProject(newProjName) {
+        saveScreenToDB(); 
+        currentProject = newProjName; 
+        renderScreenFromDB(currentProject); 
+        triggerAutoSave(true);
+    }
+
+    function addNewProject() {
+        let newName = prompt("ตั้งชื่อโปรเจกต์ใหม่:");
+        if(!newName || newName.trim() === "") return;
+        if(appDatabase[newName]) return alert("ชื่อโปรเจกต์ซ้ำ กรุณาใช้ชื่ออื่น");
+
+        saveScreenToDB(); 
+        appDatabase[newName] = { sections: [], summaryMeta: { prices: {}, checks: {}, remarks: {} } }; 
+        currentProject = newName;
+        updateProjectDropdown();
+        renderScreenFromDB(currentProject);
+        triggerAutoSave(true);
+    }
+
+    function deleteCurrentProject() {
+        if(Object.keys(appDatabase).length <= 1) return alert("ไม่สามารถลบได้ ต้องมีอย่างน้อย 1 โปรเจกต์");
+        if(confirm(`คุณแน่ใจหรือไม่ที่จะลบ "${currentProject}" ? ข้อมูลจะหายไปทั้งหมด`)) {
+            delete appDatabase[currentProject];
+            currentProject = Object.keys(appDatabase)[0]; 
+            updateProjectDropdown();
+            renderScreenFromDB(currentProject);
+            triggerAutoSave(true);
+        }
+    }
+
+    function autoResize(el) { el.style.height = 'auto'; el.style.height = (el.scrollHeight) + 'px'; }
+
+    function updateColor(s) {
+        s.classList.remove('status-red','status-orange','status-yellow','status-blue','status-green');
+        const val = s.value;
+        if(val === 'red') s.classList.add('status-red');
+        else if(val === 'orange') s.classList.add('status-orange');
+        else if(val === 'yellow') s.classList.add('status-yellow');
+        else if(val === 'blue') s.classList.add('status-blue');
+        else if(val === 'green') s.classList.add('status-green');
+    }
+
+    function updateRowNumbers(tbody) {
+        tbody.querySelectorAll("tr").forEach((row, idx) => {
+            let numCell = row.querySelector('.row-number');
+            if (numCell) numCell.innerText = idx + 1;
+        });
+    }
+
+    function createSection(title, areas) {
+        const container = document.getElementById('sectionsContainer');
+        const sectionId = 'sec_' + Date.now() + Math.random().toString(16).slice(2);
+        
+        const html = `
+            <div class="category-section" id="${sectionId}">
+                <div class="category-header-bar">
+                    <input type="text" value="${title}" class="category-title-input">
+                    <button class="btn-delete" onclick="deleteSection('${sectionId}')">ลบหมวดนี้</button>
+                </div>
+                <table>
+                    <thead>
+                        <tr>
+                            <th rowspan="2" class="col-no">No.</th>
+                            <th rowspan="2" class="col-item">รายการอุปกรณ์</th>
+                            <th colspan="${areas.length}" class="qty-group-header">
+                                จำนวนที่ต้องใช้ <button class="btn-add-col" onclick="addQtyColumn('${sectionId}')">+</button>
+                            </th>
+                            <th rowspan="2" class="col-source">สั่งซื้อจาก</th>
+                            <th rowspan="2" class="col-status">สถานะการสั่ง</th>
+                            <th colspan="3">การตรวจสอบ</th>
+                            <th rowspan="2" class="col-remark">หมายเหตุ</th>
+                            <th rowspan="2" style="width: 90px;">สรุปจำนวน<br>สั่งซื้อ</th>
+                            <th rowspan="2" class="col-manage manage-col">จัดการ</th>
+                        </tr>
+                        <tr class="sub-header-row">
+                            ${areas.map(a => `
+                                <th class="qty-col-header">
+                                    <input type="text" value="${a}" class="header-input">
+                                    <button class="btn-del-col" onclick="removeQtyColumn(this, '${sectionId}')">✖</button>
+                                </th>
+                            `).join('')}
+                            <th class="col-check inspector-header">ปลา</th>
+                            <th class="col-check">พี่โอ๋</th>
+                            <th class="col-check">พี่มุก</th>
+                        </tr>
+                    </thead>
+                    <tbody class="table-body"></tbody>
+                </table>
+                <button class="btn-add-row" onclick="addRow('${sectionId}')">+ เพิ่มรายการในหมวดนี้</button>
+            </div>
+        `;
+        container.insertAdjacentHTML('beforeend', html);
+        return sectionId;
+    }
+
+    function deleteSection(id) { 
+        if(confirm("ลบหมวดนี้?")) {
+            document.getElementById(id).remove(); 
+            triggerAutoSave(true);
+        }
+    }
+
+    function addRow(sectionId, data = null) {
+        const section = document.getElementById(sectionId);
+        const tbody = section.querySelector('.table-body');
+        const qtyCount = section.querySelectorAll('.qty-col-header').length;
+        const tr = document.createElement('tr');
+        
+        let qtyTds = '';
+        for(let i=0; i<qtyCount; i++) {
+            let val = (data && data.qtys) ? (data.qtys[i] || '') : '';
+            qtyTds += `<td class="qty-cell"><input type="text" value="${val}"></td>`;
+        }
+
+        let summaryQty = data && data.summaryQty !== undefined ? data.summaryQty : "";
+
+        tr.innerHTML = `
+            <td class="row-number"></td>
+            <td><textarea class="auto-expand" rows="1" oninput="autoResize(this)">${data ? data.item : ''}</textarea></td>
+            ${qtyTds}
+            <td class="source-cell">
+                <select>
+                    <option value="-" ${!data || !data.source || data.source === '-' ? 'selected' : ''}>-</option>
+                    <option value="Shopee" ${data && data.source === 'Shopee' ? 'selected' : ''}>Shopee</option>
+                    <option value="โฮมโปร" ${data && data.source === 'โฮมโปร' ? 'selected' : ''}>โฮมโปร</option>
+                    <option value="ไทวัสดุ" ${data && data.source === 'ไทวัสดุ' ? 'selected' : ''}>ไทวัสดุ</option>
+                    <option value="อลูเกลซ" ${data && data.source === 'อลูเกลซ' ? 'selected' : ''}>อลูเกลซ</option>
+                    <option value="KSR Electric" ${data && data.source === 'KSR Electric' ? 'selected' : ''}>KSR Electric</option>
+                    <option value="ช่างซื้อ" ${data && data.source === 'ช่างซื้อ' ? 'selected' : ''}>ช่างซื้อ</option>
+                    <option value="มีของใน stock" ${data && data.source === 'มีของใน stock' ? 'selected' : ''}>มีของใน stock</option>
+                </select>
+            </td>
+            <td>
+                <select class="status-select" onchange="updateColor(this)">
+                    <option value="none" ${!data || !data.status || data.status === 'none' ? 'selected' : ''}>- / -</option>
+                    <option value="red" ${data && data.status === 'red' ? 'selected' : ''}>🔴 เตรียมสั่ง / รอสรุป</option>
+                    <option value="orange" ${data && data.status === 'orange' ? 'selected' : ''}>🟠 ใส่ตะกร้า / รอจ่ายเงิน</option>
+                    <option value="yellow" ${data && data.status === 'yellow' ? 'selected' : ''}>🟡 ของครบ / เหลือน้อยกว่า 4</option>
+                    <option value="blue" ${data && data.status === 'blue' ? 'selected' : ''}>🔵 มีของในสต็อกแล้ว</option>
+                    <option value="green" ${data && data.status === 'green' ? 'selected' : ''}>🟢 ของถึงหน้างานแล้ว</option>
+                </select>
+            </td>
+            <td><input type="checkbox" ${data && data.checks && data.checks[0] ? 'checked' : ''}></td>
+            <td><input type="checkbox" ${data && data.checks && data.checks[1] ? 'checked' : ''}></td>
+            <td><input type="checkbox" ${data && data.checks && data.checks[2] ? 'checked' : ''}></td>
+            <td><textarea class="auto-expand remark-input" rows="1" oninput="autoResize(this)">${data ? data.remark : ''}</textarea></td>
+            <td><input type="text" class="summary-qty-input" value="${summaryQty}" placeholder="ระบุเลข" style="font-weight:bold; color:#c0392b; background-color:#fdf2e9; border-radius:4px;"></td>
+            <td class="manage-col"><button class="btn-delete" onclick="deleteRow(this, '${sectionId}')">ลบ</button></td>
+        `;
+        tbody.appendChild(tr);
+        updateColor(tr.querySelector('.status-select'));
+        updateRowNumbers(tbody);
+        tr.querySelectorAll('textarea').forEach(t => autoResize(t));
+    }
+
+    function deleteRow(btn, sid) { 
+        const tb = btn.closest('tbody'); 
+        btn.closest('tr').remove(); 
+        updateRowNumbers(tb); 
+        triggerAutoSave(true);
+    }
+
+    function addQtyColumn(sid) {
+        const sec = document.getElementById(sid);
+        const header = sec.querySelector('.sub-header-row');
+        const th = document.createElement("th");
+        th.className = "qty-col-header";
+        th.innerHTML = `<input type="text" value="พื้นที่ใหม่" class="header-input"> <button class="btn-del-col" onclick="removeQtyColumn(this, '${sid}')">✖</button>`;
+        header.insertBefore(th, sec.querySelector('.inspector-header'));
+        sec.querySelector('.qty-group-header').colSpan = sec.querySelectorAll('.qty-col-header').length;
+        sec.querySelectorAll(".table-body tr").forEach(r => {
+            const td = document.createElement("td"); td.className = "qty-cell"; td.innerHTML = '<input type="text" value="">';
+            r.insertBefore(td, r.querySelector('.source-cell'));
+        });
+        triggerAutoSave(true);
+    }
+
+    function removeQtyColumn(btn, sid) {
+        const sec = document.getElementById(sid);
+        const headers = sec.querySelectorAll('.qty-col-header');
+        if(headers.length <= 1) return;
+        const th = btn.closest('th');
+        const idx = Array.from(th.parentNode.children).indexOf(th);
+        th.remove();
+        sec.querySelector('.qty-group-header').colSpan = headers.length - 1;
+        sec.querySelectorAll(".table-body tr").forEach(r => r.querySelectorAll('td')[idx].remove());
+        triggerAutoSave(true);
+    }
+
+    async function handleImport(input) {
+        const file = input.files[0]; if(!file) return;
+        const workbook = new ExcelJS.Workbook();
+        await workbook.xlsx.load(file);
+        const worksheet = workbook.worksheets[0];
+        
+        if(!confirm(`ต้องการนำเข้าข้อมูลทับโปรเจกต์ "${currentProject}" ใช่หรือไม่?`)) return;
+        document.getElementById('sectionsContainer').innerHTML = "";
+
+        let currentSectionId = null;
+        let areaNames = [];
+
+        worksheet.eachRow({ includeEmpty: false }, (row, rowNumber) => {
+            const firstCell = row.getCell(1);
+            if (row.cellCount === 1 || (firstCell.value && !row.getCell(2).value)) {
+                const nextRow2 = worksheet.getRow(rowNumber + 2);
+                areaNames = [];
+                let cIdx = 3;
+                while(true) {
+                    let val = nextRow2.getCell(cIdx).value;
+                    if(!val || val === "ปลา") break;
+                    areaNames.push(val); cIdx++;
+                }
+                currentSectionId = createSection(firstCell.value, areaNames);
+            } else if (currentSectionId && row.getCell(1).value !== 'No.' && isNaN(row.getCell(1).value) === false) {
+                let data = {
+                    item: row.getCell(2).value, qtys: [], source: row.getCell(3 + areaNames.length).value,
+                    status: row.getCell(4 + areaNames.length).value,
+                    checks: [ row.getCell(5 + areaNames.length).value === '✓', row.getCell(6 + areaNames.length).value === '✓', row.getCell(7 + areaNames.length).value === '✓' ],
+                    remark: row.getCell(8 + areaNames.length).value,
+                    summaryQty: row.getCell(9 + areaNames.length).value || ""
+                };
+                for(let i=0; i<areaNames.length; i++) data.qtys.push(row.getCell(3+i).value);
+                addRow(currentSectionId, data);
+            }
+        });
+        input.value = "";
+        triggerAutoSave(true);
+    }
+
+    async function exportBeautifulExcel() {
+        try {
+            const workbook = new ExcelJS.Workbook();
+            const worksheet = workbook.addWorksheet('Checklist');
+            const sections = document.querySelectorAll('.category-section');
+
+            sections.forEach(sec => {
+                const titleInput = sec.querySelector('.category-title-input');
+                const title = titleInput ? titleInput.value : 'ไม่มีชื่อหมวดหมู่';
+                
+                const areaInputs = sec.querySelectorAll('.qty-col-header input');
+                const areas = Array.from(areaInputs).map(input => input.value);
+                const totalCols = 9 + areas.length;
+
+                const tRow = worksheet.addRow([title]);
+                worksheet.mergeCells(tRow.number, 1, tRow.number, totalCols);
+                tRow.eachCell(c => { 
+                    c.fill = { type:'pattern', pattern:'solid', fgColor:{argb:'FF8AB0B5'}}; 
+                    c.font = {bold:true, size:13}; 
+                    c.alignment={horizontal:'center'}; 
+                });
+
+                const h1 = ['No.', 'รายการอุปกรณ์', 'จำนวนที่ต้องใช้', ...Array(areas.length - 1).fill(''), 'สั่งซื้อจาก', 'สถานะการสั่ง', 'การตรวจสอบ', '', '', 'หมายเหตุ', 'สรุปจำนวนสั่งซื้อ'];
+                const h2 = ['', '', ...areas, '', '', 'ปลา', 'พี่โอ๋', 'พี่มุก', '', ''];
+                
+                const r1 = worksheet.addRow(h1); 
+                const r2 = worksheet.addRow(h2);
+                const sr = r1.number;
+                
+                worksheet.mergeCells(sr, 1, sr + 1, 1); 
+                worksheet.mergeCells(sr, 2, sr + 1, 2);
+                worksheet.mergeCells(sr, 3, sr, 3 + areas.length - 1);
+                worksheet.mergeCells(sr, 3 + areas.length, sr + 1, 3 + areas.length);
+                worksheet.mergeCells(sr, 4 + areas.length, sr + 1, 4 + areas.length);
+                worksheet.mergeCells(sr, 5 + areas.length, sr, 7 + areas.length);
+                worksheet.mergeCells(sr, 8 + areas.length, sr + 1, 8 + areas.length);
+                worksheet.mergeCells(sr, 9 + areas.length, sr + 1, 9 + areas.length);
+
+                [r1, r2].forEach(row => row.eachCell(cell => { 
+                    cell.fill = {type:'pattern', pattern:'solid', fgColor:{argb:'FF34495E'}}; 
+                    cell.font = {bold:true, color:{argb:'FFFFFFFF'}}; 
+                    cell.alignment={horizontal:'center', vertical:'middle'}; 
+                }));
+
+                const trs = sec.querySelectorAll('.table-body tr');
+                trs.forEach(tr => {
+                    let rd = [];
+                    const tds = tr.querySelectorAll('td:not(.manage-col)');
+                    tds.forEach(td => {
+                        const inputField = td.querySelector('input[type="text"], textarea'); 
+                        const selectField = td.querySelector('select'); 
+                        const checkboxField = td.querySelector('input[type="checkbox"]');
+                        
+                        if (inputField) {
+                            rd.push(inputField.value); 
+                        } else if (selectField) {
+                            rd.push(selectField.options[selectField.selectedIndex].text.replace(/🔴|🟠|🟡|🔵|🟢/g, '').trim()); 
+                        } else if (checkboxField) {
+                            rd.push(checkboxField.checked ? '✓' : ''); 
+                        } else {
+                            rd.push(td.innerText);
+                        }
+                    });
+                    const nr = worksheet.addRow(rd); 
+                    nr.alignment = {vertical:'middle', horizontal:'center', wrapText:true}; 
+                    nr.getCell(2).alignment = {horizontal:'left', wrapText:true};
+                });
+                worksheet.addRow([]);
+            });
+
+            worksheet.getColumn(1).width = 5; 
+            worksheet.getColumn(2).width = 35;
+            worksheet.getColumn(11).width = 15;
+            
+            worksheet.eachRow(row => row.eachCell(cell => {
+                cell.border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
+            }));
+            
+            const buf = await workbook.xlsx.writeBuffer();
+            saveAs(new Blob([buf]), `Checklist_${currentProject}.xlsx`);
+
+        } catch (error) {
+            alert("เจอข้อผิดพลาดตอน Export: " + error.message);
+            console.error(error);
+        }
+    }
+
+    // ==========================================
+    // 📊 ระบบสรุปยอดสั่งซื้อแยกตาม "แหล่งสั่งซื้อ" (ดึงจากช่อง 'สรุปจำนวนสั่งซื้อ')
+    // ==========================================
+    function generateSummary() {
+        let summaryData = {};
+        const excludedSources = ['-', 'มีของใน stock', 'ช่างซื้อ'];
+
+        const sections = document.querySelectorAll('.category-section');
+        sections.forEach(sec => {
+            sec.querySelectorAll('.table-body tr').forEach(tr => {
+                const itemNode = tr.querySelector('td:nth-child(2) textarea');
+                const itemName = itemNode ? itemNode.value.trim() : "";
+                
+                const sourceSelect = tr.querySelector('.source-cell select');
+                const source = sourceSelect ? sourceSelect.value : "-";
+
+                // ดึงตัวเลขจากคอลัมน์ "สรุปจำนวนสั่งซื้อ"
+                const summaryQtyInput = tr.querySelector('.summary-qty-input');
+                let rowTotal = 0;
+                if (summaryQtyInput) {
+                    let valStr = summaryQtyInput.value.replace(/[^0-9.]/g, ''); 
+                    rowTotal = parseFloat(valStr);
+                    if (isNaN(rowTotal)) rowTotal = 0;
+                }
+
+                if (itemName !== "" && !excludedSources.includes(source)) {
+                    if (rowTotal > 0) {
+                        if (!summaryData[source]) summaryData[source] = {};
+                        summaryData[source][itemName] = (summaryData[source][itemName] || 0) + rowTotal;
+                    }
+                }
+            });
+        });
+
+        const summaryBody = document.getElementById('summaryBody');
+        if(!summaryBody) return;
+        summaryBody.innerHTML = "";
+
+        let hasData = false;
+        let grandTotal = 0;
+
+        const sources = Object.keys(summaryData).sort();
+
+        sources.forEach(src => {
+            let sourceTotalCost = 0;
+            
+            for (let item in summaryData[src]) {
+                hasData = true;
+                const qty = summaryData[src][item];
+                const key = src + "_||_" + item; 
+
+                const isChecked = currentSummaryMeta.checks[key] ? 'checked' : '';
+                const price = currentSummaryMeta.prices[key] || '';
+                const priceNum = parseFloat(price) || 0;
+                
+                // ดึงข้อมูลหมายเหตุของตารางสรุป
+                const remarkVal = (currentSummaryMeta.remarks && currentSummaryMeta.remarks[key]) ? currentSummaryMeta.remarks[key] : '';
+
+                sourceTotalCost += priceNum;
+                grandTotal += priceNum;
+
+                const tr = document.createElement('tr');
+                tr.setAttribute('data-source', src);
+                tr.innerHTML = `
+                    <td style="text-align: left; padding: 8px 15px; border: 1px solid #bdc3c7; font-weight: bold; background: #fff;">${item}</td>
+                    <td style="text-align: center; padding: 8px; border: 1px solid #bdc3c7; background: #fff;">
+                        <input type="text" class="summary-remark-input" value="${remarkVal}" oninput="updateSummaryMeta('${key}', 'remark', this.value)" placeholder="ใส่หมายเหตุ..." style="width: 90%; padding: 6px; border: 1px solid #ccc; border-radius: 4px; font-size: 13px;">
+                    </td>
+                    <td style="text-align: center; padding: 8px; border: 1px solid #bdc3c7; font-weight: bold; color: #d35400; background: #fff;">${qty}</td>
+                    <td style="text-align: center; padding: 8px; border: 1px solid #bdc3c7; background: #fff;">
+                        <span style="background-color: #ecf0f1; padding: 4px 8px; border-radius: 4px; font-size: 13px; color: #2c3e50; font-weight: bold; border: 1px solid #dcdde1;">${src}</span>
+                    </td>
+                    <td style="text-align: center; padding: 8px; border: 1px solid #bdc3c7; background: #fff;">
+                        <input type="number" class="summary-price-input" value="${price}" oninput="updateSummaryMeta('${key}', 'price', this.value)" placeholder="ใส่ราคารวม..." style="width: 80%; padding: 6px; text-align: center; border: 1px solid #ccc; border-radius: 4px; font-size: 14px;">
+                    </td>
+                    <td style="text-align: center; border: 1px solid #bdc3c7; background: #fff;">
+                        <input type="checkbox" onchange="updateSummaryMeta('${key}', 'check', this.checked)" ${isChecked} style="width:18px; height:18px; cursor: pointer; accent-color: #3498db;">
+                    </td>
+                `;
+                summaryBody.appendChild(tr);
+            }
+            
+            const subKey = "subtotal_||_" + src;
+            const isSubChecked = currentSummaryMeta.checks[subKey] ? 'checked' : '';
+            const subRow = document.createElement('tr');
+            subRow.innerHTML = `
+                <td colspan="4" style="text-align: right; padding: 8px 15px; border: 1px solid #bdc3c7; font-weight: bold; background-color: #f2f4f4; color: #2c3e50;">รวมยอดสั่งซื้อ ${src} (ติ๊กเมื่อสั่งเรียบร้อย) ➔</td>
+                <td data-subtotal-src="${src}" style="text-align: center; padding: 8px; border: 1px solid #bdc3c7; font-weight: bold; background-color: #f2f4f4; color: #27ae60; font-size: 16px;">${sourceTotalCost.toLocaleString()} บาท</td>
+                <td style="text-align: center; border: 1px solid #bdc3c7; background-color: #f2f4f4;">
+                    <input type="checkbox" onchange="updateSummaryMeta('${subKey}', 'check', this.checked)" ${isSubChecked} style="width:20px; height:20px; cursor: pointer; accent-color: #27ae60;" title="ติ๊กเมื่อสั่งซื้อของจากเจ้านี้ครบแล้ว">
+                </td>
+            `;
+            summaryBody.appendChild(subRow);
+        });
+
+        if(!hasData) {
+            summaryBody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: #7f8c8d; padding: 15px; border: 1px solid #bdc3c7;">ไม่มีรายการที่ต้องสั่งซื้อ (รายการที่ไม่ได้ระบุสรุปจำนวน, หรือเป็นสถานะ ว่าง/มีในสต็อก/ช่างซื้อ จะถูกซ่อนไว้)</td></tr>`;
+        } else {
+            const grandRow = document.createElement('tr');
+            grandRow.innerHTML = `
+                <td colspan="4" style="text-align: right; padding: 12px 15px; border: 1px solid #bdc3c7; font-weight: bold; background-color: #e8f8f5; font-size: 16px; color: #117864;">ยอดรวมสั่งซื้อทั้งหมด</td>
+                <td id="grandtotal" style="text-align: center; padding: 12px; border: 1px solid #bdc3c7; font-weight: bold; background-color: #e8f8f5; color: #c0392b; font-size: 18px;">${grandTotal.toLocaleString()} บาท</td>
+                <td style="background-color: #e8f8f5; border: 1px solid #bdc3c7;"></td>
+            `;
+            summaryBody.appendChild(grandRow);
+        }
+    }
+
+    function updateSummaryMeta(key, type, value) {
+        if (!currentSummaryMeta.prices) currentSummaryMeta.prices = {};
+        if (!currentSummaryMeta.checks) currentSummaryMeta.checks = {};
+        if (!currentSummaryMeta.remarks) currentSummaryMeta.remarks = {}; 
+        
+        if (type === 'price') {
+            currentSummaryMeta.prices[key] = value;
+            recalculateSummaryTotals(); 
+        } else if (type === 'check') {
+            currentSummaryMeta.checks[key] = value;
+        } else if (type === 'remark') {
+            currentSummaryMeta.remarks[key] = value; 
+        }
+        triggerAutoSave(false); 
+    }
+
+    function recalculateSummaryTotals() {
+        let grandTotal = 0;
+        const sourceTotals = {};
+        
+        const rows = document.querySelectorAll('#summaryBody tr[data-source]');
+        rows.forEach(tr => {
+            const src = tr.getAttribute('data-source');
+            const priceInput = tr.querySelector('.summary-price-input');
+            const price = parseFloat(priceInput.value) || 0;
+            sourceTotals[src] = (sourceTotals[src] || 0) + price;
+            grandTotal += price;
+        });
+
+        for (let src in sourceTotals) {
+            const subEl = document.querySelector(`td[data-subtotal-src="${src}"]`);
+            if (subEl) subEl.innerText = sourceTotals[src].toLocaleString() + " บาท";
+        }
+        const grandEl = document.getElementById('grandtotal');
+        if (grandEl) grandEl.innerText = grandTotal.toLocaleString() + " บาท";
+    }
+</script>
+</body>
+</html>
