@@ -19,6 +19,7 @@
         .project-controls { display: flex; align-items: center; gap: 10px; }
         .project-select { padding: 8px; font-size: 16px; border-radius: 4px; border: 1px solid #bdc3c7; font-weight: bold; width: 250px; }
         .btn-add-proj { background-color: #2980b9; color: white; border: none; padding: 8px 15px; border-radius: 4px; cursor: pointer; font-weight: bold; }
+        .btn-edit-proj { background-color: #f39c12; color: white; border: none; padding: 8px 15px; border-radius: 4px; cursor: pointer; font-weight: bold; }
         .btn-del-proj { background-color: #c0392b; color: white; border: none; padding: 8px 15px; border-radius: 4px; cursor: pointer; font-weight: bold; }
 
         /* เมนูส่วนหัว */
@@ -36,12 +37,12 @@
         .category-header-bar input:hover { border-color: #fff; }
         .category-header-bar input:focus { background: #fff; outline: none; border-style: solid; }
 
-        table { width: 100%; border-collapse: collapse; min-width: 1200px; table-layout: fixed; }
+        table { width: 100%; border-collapse: collapse; min-width: 1350px; table-layout: fixed; }
         th, td { border: 1px solid #7a9ea4; padding: 6px; text-align: center; vertical-align: middle; }
         th { background-color: #f0f5f6; color: #333; font-weight: bold; font-size: 13px; }
 
-        .col-no { width: 45px; } .col-item { width: 260px; } .col-source { width: 120px; }
-        .col-status { width: 170px; } .col-check { width: 50px; } .col-remark { width: 160px; } .col-manage { width: 60px; }
+        .col-no { width: 45px; } .col-item { width: 220px; } .col-source { width: 120px; }
+        .col-status { width: 160px; } .col-custom-text { width: 150px; background-color: #e8f8f5 !important; } .col-check { width: 50px; } .col-remark { width: 160px; } .col-manage { width: 60px; }
 
         input[type="text"], textarea { width: 100%; box-sizing: border-box; border: 1px solid transparent; padding: 4px; font-size: 13px; font-family: inherit; background-color: transparent; text-align: center; }
         textarea.auto-expand { resize: none; overflow: hidden; text-align: left; line-height: 1.4; min-height: 28px; }
@@ -82,6 +83,7 @@
         <div class="project-controls">
             <span>📂 <b>โปรเจกต์:</b></span>
             <select id="projectSelector" class="project-select" onchange="switchProject(this.value)"></select>
+            <button class="btn-edit-proj" onclick="editProjectName()">✏️ แก้ไขชื่อ</button>
             <button class="btn-add-proj" onclick="addNewProject()">+ สร้างโปรเจกต์ใหม่</button>
         </div>
         <div>
@@ -239,7 +241,17 @@
                 let qtys = Array.from(tr.querySelectorAll('.qty-cell input')).map(inp => inp.value);
                 let source = tr.querySelector('.source-cell select').value;
                 let statusValue = tr.querySelector('.status-select').value;
-                let checks = Array.from(tr.querySelectorAll('input[type="checkbox"]')).map(c => c.checked);
+                
+                let customTextNode = tr.querySelector('.custom-text-input');
+                let customText = customTextNode ? customTextNode.value : "";
+                
+                let checkElements = Array.from(tr.querySelectorAll('input[type="checkbox"]'));
+                let checks = [
+                    checkElements[1] ? checkElements[1].checked : false, // ปลา 2
+                    checkElements[2] ? checkElements[2].checked : false, // โอ๋
+                    checkElements[3] ? checkElements[3].checked : false, // มุก
+                    checkElements[0] ? checkElements[0].checked : false  // ปลา 1
+                ];
                 
                 let remarkNode = tr.querySelector('.remark-input');
                 let remark = remarkNode ? remarkNode.value : "";
@@ -247,7 +259,7 @@
                 let summaryQtyNode = tr.querySelector('.summary-qty-input');
                 let summaryQty = summaryQtyNode ? summaryQtyNode.value : "";
 
-                rows.push({ item, qtys, source, status: statusValue, checks, remark, summaryQty });
+                rows.push({ item, qtys, source, status: statusValue, customText, checks, remark, summaryQty });
             });
             screenData.push({ title, areas, rows });
         });
@@ -282,6 +294,21 @@
         saveScreenToDB(); 
         currentProject = newProjName; 
         renderScreenFromDB(currentProject); 
+        triggerAutoSave(true);
+    }
+
+    function editProjectName() {
+        let newName = prompt("แก้ไขชื่อโปรเจกต์:", currentProject);
+        
+        if(!newName || newName.trim() === "" || newName === currentProject) return;
+        if(appDatabase[newName]) return alert("ชื่อโปรเจกต์ซ้ำ กรุณาใช้ชื่ออื่น");
+
+        saveScreenToDB(); 
+        appDatabase[newName] = appDatabase[currentProject];
+        delete appDatabase[currentProject];
+        
+        currentProject = newName;
+        updateProjectDropdown();
         triggerAutoSave(true);
     }
 
@@ -348,7 +375,8 @@
                             </th>
                             <th rowspan="2" class="col-source">สั่งซื้อจาก</th>
                             <th rowspan="2" class="col-status">สถานะการสั่ง</th>
-                            <th colspan="3">การตรวจสอบ</th>
+                            <th rowspan="2" class="col-custom-text">ตรวจก่อนช่างเข้า</th>
+                            <th colspan="4">การตรวจสอบ</th>
                             <th rowspan="2" class="col-remark">หมายเหตุ</th>
                             <th rowspan="2" style="width: 90px;">สรุปจำนวน<br>สั่งซื้อ</th>
                             <th rowspan="2" class="col-manage manage-col">จัดการ</th>
@@ -360,7 +388,8 @@
                                     <button class="btn-del-col" onclick="removeQtyColumn(this, '${sectionId}')">✖</button>
                                 </th>
                             `).join('')}
-                            <th class="col-check inspector-header">ปลา</th>
+                            <th class="col-check">ปลา 1</th>
+                            <th class="col-check inspector-header">ปลา 2</th>
                             <th class="col-check">พี่โอ๋</th>
                             <th class="col-check">พี่มุก</th>
                         </tr>
@@ -421,6 +450,8 @@
                     <option value="green" ${data && data.status === 'green' ? 'selected' : ''}>🟢 ของถึงหน้างานแล้ว</option>
                 </select>
             </td>
+            <td><textarea class="auto-expand custom-text-input" rows="1" oninput="autoResize(this)" placeholder="">${data && data.customText ? data.customText : ''}</textarea></td>
+            <td><input type="checkbox" ${data && data.checks && data.checks[3] ? 'checked' : ''}></td>
             <td><input type="checkbox" ${data && data.checks && data.checks[0] ? 'checked' : ''}></td>
             <td><input type="checkbox" ${data && data.checks && data.checks[1] ? 'checked' : ''}></td>
             <td><input type="checkbox" ${data && data.checks && data.checks[2] ? 'checked' : ''}></td>
@@ -447,7 +478,9 @@
         const th = document.createElement("th");
         th.className = "qty-col-header";
         th.innerHTML = `<input type="text" value="พื้นที่ใหม่" class="header-input"> <button class="btn-del-col" onclick="removeQtyColumn(this, '${sid}')">✖</button>`;
-        header.insertBefore(th, sec.querySelector('.inspector-header'));
+        
+        header.insertBefore(th, sec.querySelectorAll('.col-check')[0]);
+        
         sec.querySelector('.qty-group-header').colSpan = sec.querySelectorAll('.qty-col-header').length;
         sec.querySelectorAll(".table-body tr").forEach(r => {
             const td = document.createElement("td"); td.className = "qty-cell"; td.innerHTML = '<input type="text" value="">';
@@ -488,7 +521,7 @@
                 let cIdx = 3;
                 while(true) {
                     let val = nextRow2.getCell(cIdx).value;
-                    if(!val || val === "ปลา") break;
+                    if(!val || val === "ปลา 1") break; 
                     areaNames.push(val); cIdx++;
                 }
                 currentSectionId = createSection(firstCell.value, areaNames);
@@ -496,9 +529,15 @@
                 let data = {
                     item: row.getCell(2).value, qtys: [], source: row.getCell(3 + areaNames.length).value,
                     status: row.getCell(4 + areaNames.length).value,
-                    checks: [ row.getCell(5 + areaNames.length).value === '✓', row.getCell(6 + areaNames.length).value === '✓', row.getCell(7 + areaNames.length).value === '✓' ],
-                    remark: row.getCell(8 + areaNames.length).value,
-                    summaryQty: row.getCell(9 + areaNames.length).value || ""
+                    customText: row.getCell(5 + areaNames.length).value || "",
+                    checks: [ 
+                        row.getCell(7 + areaNames.length).value === '✓', // ปลา 2
+                        row.getCell(8 + areaNames.length).value === '✓', // โอ๋
+                        row.getCell(9 + areaNames.length).value === '✓', // มุก
+                        row.getCell(6 + areaNames.length).value === '✓'  // ปลา 1
+                    ],
+                    remark: row.getCell(10 + areaNames.length).value,
+                    summaryQty: row.getCell(11 + areaNames.length).value || ""
                 };
                 for(let i=0; i<areaNames.length; i++) data.qtys.push(row.getCell(3+i).value);
                 addRow(currentSectionId, data);
@@ -520,7 +559,7 @@
                 
                 const areaInputs = sec.querySelectorAll('.qty-col-header input');
                 const areas = Array.from(areaInputs).map(input => input.value);
-                const totalCols = 9 + areas.length;
+                const totalCols = 11 + areas.length; 
 
                 const tRow = worksheet.addRow([title]);
                 worksheet.mergeCells(tRow.number, 1, tRow.number, totalCols);
@@ -530,8 +569,8 @@
                     c.alignment={horizontal:'center'}; 
                 });
 
-                const h1 = ['No.', 'รายการอุปกรณ์', 'จำนวนที่ต้องใช้', ...Array(areas.length - 1).fill(''), 'สั่งซื้อจาก', 'สถานะการสั่ง', 'การตรวจสอบ', '', '', 'หมายเหตุ', 'สรุปจำนวนสั่งซื้อ'];
-                const h2 = ['', '', ...areas, '', '', 'ปลา', 'พี่โอ๋', 'พี่มุก', '', ''];
+                const h1 = ['No.', 'รายการอุปกรณ์', 'จำนวนที่ต้องใช้', ...Array(areas.length - 1).fill(''), 'สั่งซื้อจาก', 'สถานะการสั่ง', 'ตรวจก่อนช่างเข้า', 'การตรวจสอบ', '', '', '', 'หมายเหตุ', 'สรุปจำนวนสั่งซื้อ'];
+                const h2 = ['', '', ...areas, '', '', '', 'ปลา 1', 'ปลา 2', 'พี่โอ๋', 'พี่มุก', '', ''];
                 
                 const r1 = worksheet.addRow(h1); 
                 const r2 = worksheet.addRow(h2);
@@ -542,9 +581,10 @@
                 worksheet.mergeCells(sr, 3, sr, 3 + areas.length - 1);
                 worksheet.mergeCells(sr, 3 + areas.length, sr + 1, 3 + areas.length);
                 worksheet.mergeCells(sr, 4 + areas.length, sr + 1, 4 + areas.length);
-                worksheet.mergeCells(sr, 5 + areas.length, sr, 7 + areas.length);
-                worksheet.mergeCells(sr, 8 + areas.length, sr + 1, 8 + areas.length);
-                worksheet.mergeCells(sr, 9 + areas.length, sr + 1, 9 + areas.length);
+                worksheet.mergeCells(sr, 5 + areas.length, sr + 1, 5 + areas.length); 
+                worksheet.mergeCells(sr, 6 + areas.length, sr, 9 + areas.length); 
+                worksheet.mergeCells(sr, 10 + areas.length, sr + 1, 10 + areas.length); 
+                worksheet.mergeCells(sr, 11 + areas.length, sr + 1, 11 + areas.length); 
 
                 [r1, r2].forEach(row => row.eachCell(cell => { 
                     cell.fill = {type:'pattern', pattern:'solid', fgColor:{argb:'FF34495E'}}; 
@@ -580,7 +620,7 @@
 
             worksheet.getColumn(1).width = 5; 
             worksheet.getColumn(2).width = 35;
-            worksheet.getColumn(11).width = 15;
+            worksheet.getColumn(13).width = 15; 
             
             worksheet.eachRow(row => row.eachCell(cell => {
                 cell.border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
